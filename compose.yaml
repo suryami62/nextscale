@@ -1,0 +1,44 @@
+services:
+    tailscale:
+        image: tailscale/tailscale:stable
+        container_name: nextscale-ts
+        hostname: nextscale
+        environment:
+            - TS_AUTHKEY=tskey-client-******
+            - TS_HOSTNAME=nextscale
+            - TS_SERVE_CONFIG=/config/serveconfig.json
+            - TS_STATE_DIR=/var/lib/tailscale
+        volumes:
+            - ./ts-state:/var/lib/tailscale
+            - ./ts-config:/config
+            - /dev/net/tun:/dev/net/tun
+        cap_add:
+            - NET_ADMIN
+            - SYS_MODULE
+        restart: unless-stopped
+
+    nextcloud:
+        image: nextcloud:stable-fpm-alpine
+        container_name: nextscale-nc
+        environment:
+            - MYSQL_HOST=localhost
+            - MYSQL_DATABASE=nextscale
+            - MYSQL_USER=itsme
+            - MYSQL_PASSWORD=thebestpasswordever
+        volumes:
+            - ./nc-data:/var/www/html:z
+        depends_on:
+            - tailscale
+        restart: unless-stopped
+        network_mode: service:tailscale
+
+    nginx:
+        build: ./web-build
+        container_name: nextscale-web
+        volumes:
+            - ./nc-data:/var/www/html:z,ro
+        depends_on:
+            - tailscale
+            - nextcloud
+        restart: unless-stopped
+        network_mode: service:tailscale
